@@ -11,7 +11,7 @@ class MolecularSystem(
     val mu: Double = 39.948,
     val T: Double = 300.0
 ) {
-    private val molecules: List<Molecule> = emptyList()
+    private val molecules: List<Molecule> = setMolecules()
     private val maxwell3R: (Double) -> Double = { v: Double ->
         4 * PI * (mu / (2 * PI * R * T)).pow(1.5) * v * v * exp(- (mu * v * v / (2 * R * T)))
     }
@@ -19,11 +19,11 @@ class MolecularSystem(
 
     init {
         require(moleculesNumber > 0)
-
     }
 
-    private fun setMolecules() {
-        // TODO()
+    private fun setMolecules(): List<Molecule> {
+        val molecules = mutableListOf<Molecule>()
+        return molecules
     }
 
     companion object {
