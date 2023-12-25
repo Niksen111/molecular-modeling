@@ -4,7 +4,7 @@ import org.nksenchik.vo.Point3D
 import org.nksenchik.vo.SpeedVector
 
 class Molecule(
-    val coordinates: Point3D = Point3D(),
+    var coordinates: Point3D = Point3D(),
     var v: SpeedVector = SpeedVector(0, 0, 0)
 ) {
 
