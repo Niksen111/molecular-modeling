@@ -54,6 +54,10 @@ data class Vector3D(
 
     fun midpoint(point: Vector3D): Vector3D = midpoint(point.x, point.y, point.z)
 
+    override fun toString(): String {
+        return "[x=$x y=$y z=$z]"
+    }
+
     companion object {
         val ZERO: Vector3D = Vector3D()
     }

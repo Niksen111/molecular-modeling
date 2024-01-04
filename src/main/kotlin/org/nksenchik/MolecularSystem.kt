@@ -1,6 +1,9 @@
 package org.nksenchik
 
+import org.nksenchik.vo.History
+import org.nksenchik.vo.MoleculeToDraw
 import org.nksenchik.vo.Vector3D
+import java.io.File
 import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.pow
@@ -13,7 +16,7 @@ class MolecularSystem(
     val sigma: Double = 3.54,
     val epsilon: Double = 0.00801,
     val m0: Double = 6.6335209e-26,
-    cubeSize: Double = 1000.0
+    cubeSize: Double = 2 * sqrt(sigma / PI) * 50,
 ) {
     val T: Double
     val randomSeed = 42
@@ -23,6 +26,7 @@ class MolecularSystem(
     private val maxwell: (Double) -> Double
     private val vNaiver: Double
     private val random: Random
+    private var active = moleculesNumber
 
     init {
         require(moleculesNumber > 0)
@@ -36,13 +40,44 @@ class MolecularSystem(
         this.molecules = setMolecules()
     }
 
-    fun performSimulation(stepsNumber: Int, dt: Double = 10.0e-12): List<List<Vector3D>> {
+    fun drawTrajectories(history: List<List<History>>) {
+        val moleculesToDraw = history.flatMapIndexed { i, histories ->
+            histories.mapIndexed { j, history ->
+                MoleculeToDraw(j, i, history.coordinates.x, history.coordinates.y, history.coordinates.z)
+            }
+        }
+
+        val csv = csvOf(listOf("ID", "STEP", "X", "Y", "Z"),
+            moleculesToDraw
+        ) { molecule: MoleculeToDraw ->
+            listOf(molecule.id, molecule.step, molecule.x, molecule.y, molecule.z).map { it.toString() }
+        }
+
+        val file = File("src/main/resources/data.csv")
+        file.writeText(csv)
+        val process = ProcessBuilder("python", "src/main/resources/molecules_drawer.py").start()
+    }
+
+    private fun <T> csvOf(
+        headers: List<String>,
+        data: List<T>,
+        itemBuilder: (T) -> List<String>
+    ) = buildString {
+        append(headers.joinToString(",") { "\"$it\"" })
+        append("\n")
+        data.forEach { item ->
+            append(itemBuilder(item).joinToString(",") { "\"$it\"" })
+            append("\n")
+        }
+    }
+
+    fun performSimulation(stepsNumber: Int, dt: Double = 10.0e-12): List<List<History>> {
         val tau = sigma * sqrt(m0 / epsilon)
         val dtScaled = dt / tau
-        val history = mutableListOf(molecules.map { it.coordinates })
+        val history = mutableListOf(molecules.map { History(it) })
         for (step in 0..<stepsNumber) {
             updateSystem(dtScaled)
-            history.add(molecules.map { it.coordinates })
+            history.add(molecules.map { History(it) })
         }
 
         return history
@@ -50,22 +85,22 @@ class MolecularSystem(
 
     private fun calculateForce(firstCoords: Vector3D, secondCoords: Vector3D): Vector3D {
         val distance = firstCoords.distance(secondCoords)
-        val coefficient = -24.0 * sigma * (distance.pow(-7) - 2 * distance.pow(-13)) / distance
+        val coefficient = 24.0 * epsilon * (2 * distance.pow(-14) - distance.pow(-8))
         return (firstCoords - secondCoords).scale(coefficient)
     }
 
     private fun setMolecules(): List<Molecule> {
         val coords = generateCoordsList()
         val speedVectors = generateSpeedList()
-        val accelerations = generateAccelerations()
+        val accelerations = generateAccelerations(coords)
 
-        return speedVectors.mapIndexed {index, speedVector ->
-            Molecule(coords[index], speedVector, accelerations[index])
+        return coords.mapIndexed {index, coord ->
+            Molecule(coord, speedVectors[index], accelerations[index])
         }
     }
 
     private fun updateAcceleration(molecule: Molecule) {
-        molecule.a += calculateForce(molecule.coordinates, Vector3D(cubeSize, molecule.getY(), molecule.getZ()))
+        molecule.a = calculateForce(molecule.coordinates, Vector3D(cubeSize, molecule.getY(), molecule.getZ()))
     }
 
     private fun updateAccelerations() {
@@ -89,19 +124,26 @@ class MolecularSystem(
         molecule.coordinates = Vector3D(molecule.getX(), molecule.getY().mod(cubeSize), molecule.getZ().mod(cubeSize))
 
         if (molecule.getX() > cubeSize) {
-            molecule.coordinates = Vector3D(cubeSize - molecule.getX(), molecule.getY(), molecule.getZ())
-            molecule.v = molecule.v.scale(-1.0)
+            molecule.coordinates = Vector3D(cubeSize - (molecule.getX() - cubeSize), molecule.getY(), molecule.getZ())
+            molecule.v = Vector3D(-molecule.v.x, molecule.v.y, molecule.v.z)
         }
 
         if (molecule.getX() < 0) {
             activeMolecules[index] = false
-            molecule.coordinates = Vector3D(0, molecule.getY(), molecule.getZ())
+            active--
+            molecule.coordinates = Vector3D(-1, molecule.getY(), molecule.getZ())
         }
     }
 
     private fun updateSystemCoordinates(dt: Double) {
+        if (active == 0) {
+            return
+        }
+
         molecules.forEachIndexed { index, molecule ->
-            updateCoordinates(molecule, index, dt)
+            if (activeMolecules[index]) {
+                updateCoordinates(molecule, index, dt)
+            }
         }
     }
 
@@ -115,6 +157,8 @@ class MolecularSystem(
         return List(moleculesNumber) {
             Vector3D(0, 0, 0)
         }
+    private fun generateAccelerations(coordinates: List<Vector3D>): List<Vector3D> {
+        return coordinates.map { calculateForce(it, Vector3D(cubeSize, it.y, it.z)) }
     }
 
     private fun generateSpeedList(): List<Vector3D> {
