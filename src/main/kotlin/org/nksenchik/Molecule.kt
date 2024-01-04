@@ -1,20 +1,26 @@
 package org.nksenchik
 
-import org.nksenchik.vo.Point3D
-import org.nksenchik.vo.SpeedVector
+import org.nksenchik.vo.Vector3D
 
 class Molecule(
-    var coordinates: Point3D = Point3D(),
-    var v: SpeedVector = SpeedVector(0, 0, 0)
+    var coordinates: Vector3D = Vector3D(),
+    var v: Vector3D = Vector3D(0, 0, 0),
+    var a: Vector3D = Vector3D(0, 0, 0)
 ) {
+    fun distance(molecule: Molecule) = coordinates.distance(molecule.coordinates)
+
+    fun getX() = coordinates.x
+    fun getY() = coordinates.y
+    fun getZ() = coordinates.z
 
     override fun toString(): String {
-        return "x=${coordinates.x} y=${coordinates.y} z=${coordinates.z} v=$v"
+        return "x=${coordinates.x} y=${coordinates.y} z=${coordinates.z} v=$v a=$a"
     }
 
     override fun hashCode(): Int {
         var result = coordinates.hashCode()
         result = 31 * result + v.hashCode()
+        result = 31 * result + a.hashCode()
         return result
     }
 
@@ -37,6 +43,6 @@ class Molecule(
 
         val o: Molecule = other
 
-        return !(o.coordinates != this.coordinates || o.v != this.v)
+        return !(o.coordinates != this.coordinates || o.v != this.v || o.a != this.a)
     }
 }
