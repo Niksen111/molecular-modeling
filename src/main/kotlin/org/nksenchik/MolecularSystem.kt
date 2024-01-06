@@ -17,12 +17,15 @@ class MolecularSystem(
     val epsilon: Double = 0.00801,
     val m0: Double = 6.6335209e-26,
     cubeSize: Double = 2 * sqrt(sigma / PI) * 50,
+    u0: Double = 0.3
 ) {
     val T: Double
-    val randomSeed = 42
+    val randomSeed = 2
     val molecules: List<Molecule>
     val cubeSize: Double
     val activeMolecules: MutableList<Boolean> = MutableList(moleculesNumber) { true }
+    val m: Double
+    val u: Double
     private val maxwell: (Double) -> Double
     private val vNaiver: Double
     private val random: Random
@@ -31,12 +34,14 @@ class MolecularSystem(
     init {
         require(moleculesNumber > 0)
         this.T = T * (kB / epsilon)
-        this.maxwell = { v: Double ->
-            4 * PI * (1.0 / (2 * PI * kB * this.T)).pow(1.5) * v * v * exp(-(v * v / (2 * kB * this.T)))
-        }
+        this.m = this.m0 / m0
         this.vNaiver = sqrt(2 * this.T * kB)
         this.random = Random(randomSeed)
         this.cubeSize = cubeSize / sigma
+        this.u = u0 * (sqrt(m0 / epsilon))
+        this.maxwell = { v: Double ->
+            4 * PI * (m / (2 * PI * kB * this.T)).pow(1.5) * (v - u).pow(2) * exp(-(m * (v - u).pow(2) / (2 * kB * this.T)))
+        }
         this.molecules = setMolecules()
     }
 
@@ -55,7 +60,7 @@ class MolecularSystem(
 
         val file = File("src/main/resources/data.csv")
         file.writeText(csv)
-        val process = ProcessBuilder("python", "src/main/resources/molecules_drawer.py").start()
+        ProcessBuilder("python", "src/main/resources/molecules_drawer.py").start()
     }
 
     private fun <T> csvOf(
@@ -153,10 +158,6 @@ class MolecularSystem(
         updateAccelerations()
     }
 
-    private fun generateAccelerations(): List<Vector3D> {
-        return List(moleculesNumber) {
-            Vector3D(0, 0, 0)
-        }
     private fun generateAccelerations(coordinates: List<Vector3D>): List<Vector3D> {
         return coordinates.map { calculateForce(it, Vector3D(cubeSize, it.y, it.z)) }
     }
@@ -170,10 +171,10 @@ class MolecularSystem(
         var ceil = 0
 
         for (i in 0..<this.moleculesNumber) {
-            segments.add(Pair(i * h, (i + 1) * h))
-            moleculesCounts.add((maxwell(i * h) * h * moleculesNumber).toInt())
+            segments.add(Pair(u + i * h, u + (i + 1) * h))
+            moleculesCounts.add((maxwell(u + i * h) * h * moleculesNumber).toInt())
             ceil += moleculesCounts[i]
-            countsAndIndexes.add(Pair(i, maxwell(i * h) * h * moleculesNumber - moleculesCounts[i]))
+            countsAndIndexes.add(Pair(i, maxwell(u + i * h) * h * moleculesNumber - moleculesCounts[i]))
         }
 
         countsAndIndexes.sortByDescending { it.second }
