@@ -30,6 +30,7 @@ class MolecularSystem(
     private val vNaiver: Double
     private val random: Random
     private var active = moleculesNumber
+    private var calculateForces = false
 
     init {
         require(moleculesNumber > 0)
@@ -91,7 +92,11 @@ class MolecularSystem(
     private fun calculateForce(firstCoords: Vector3D, secondCoords: Vector3D): Vector3D {
         val distance = firstCoords.distance(secondCoords)
         val coefficient = 24.0 * epsilon * (2 * distance.pow(-14) - distance.pow(-8))
-        return (firstCoords - secondCoords).scale(coefficient)
+        return if (calculateForces) {
+            (firstCoords - secondCoords).scale(coefficient)
+        } else {
+            Vector3D.ZERO
+        }
     }
 
     private fun setMolecules(): List<Molecule> {
